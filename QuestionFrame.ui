@@ -257,7 +257,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>PushButton</string>
+    <string>End Screen</string>
    </property>
   </widget>
   <widget class="QPushButton" name="pushButton_5">

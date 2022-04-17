@@ -4,16 +4,23 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import sys
-import fitz, re
+import fitz, re, json
 
 
 # Question number : [{Question : '', Options : '', Answer: '', MarkedResponse : '', TimeTaken : ''}]
 necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
                      'TimeTaken':'', 'Comments': '', 'Explanation' : ''} for x in range(1,101)}
 
+max_questions           = 0
+total_time_available    = 0
+total_time_left         = 0
+attempted_questions     = 0
+present_ques_index      = 0
 
 class MainScreen(QtWidgets.QDialog):
     def __init__(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+
         super(MainScreen, self).__init__()
         uic.loadUi('QuizMasterFront.ui', self)
         # self.show()
@@ -36,6 +43,8 @@ class MainScreen(QtWidgets.QDialog):
         self.txtbrwsr_oldq = ''
     
     def getFile(self, ptr):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+
         fileformat = 'json' if 'old' in self.buttonGroup.checkedButton().text().lower() else 'pdf'
         fname = QFileDialog.getOpenFileName(self, 'Open file',
                                             '', f"{fileformat.upper()} (*.{fileformat})")
@@ -54,6 +63,7 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(True)
     
     def selectQuizType(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
         if 'old' in self.buttonGroup.checkedButton().text().lower() :
             self.txtbrwsr_newq = self.textBrowser.toPlainText()
             self.textBrowser.setText(self.txtbrwsr_oldq)
@@ -93,6 +103,7 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(True)
 
     def selectSolutionType(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
         selected_mode = self.buttonGroup_2.checkedButton().text().lower()
         # separate, end, after, marked
         if 'separate' not in selected_mode:
@@ -117,12 +128,15 @@ class MainScreen(QtWidgets.QDialog):
 
 
     def switchToSecondFrame(self):
-        widget.addWidget(SecondScreen())
+        if widget.count() <= 1:
+            widget.addWidget(SecondScreen())
         widget.setCurrentIndex(widget.currentIndex()+1)
 
 
 class SecondScreen(QtWidgets.QDialog):
+    
     def __init__(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
         super(SecondScreen, self).__init__()
         uic.loadUi('QuizMaster.ui', self)
         # self.show()
@@ -150,9 +164,11 @@ class SecondScreen(QtWidgets.QDialog):
                                             [question_data_parsed]
 
                 file_being_parsed = 0
+                question_index      = 0
 
                 for data_parsed in parsing_list:
                     parsing_question    = 0         # 0 for at options or parsing not started yet; 1 question being parsed
+                    max_questions       = max(max_questions, question_index)
                     question_index      = 0
                     file_being_parsed  += 1
                     for page in range(data_parsed.page_count):
@@ -229,44 +245,43 @@ class SecondScreen(QtWidgets.QDialog):
                                     necessary_data[question_index]['Explanation'] += page_line
 
         
-        # for data in necessary_data:
-        #     print(necessary_data[data])
-        #     print()
-
-        
     def switchToMainScreen(self):
-        widget.addWidget(mainwindow)
-        widget.setCurrentIndex(widget.currentIndex()+1)
+        # widget.addWidget(mainwindow)
+        widget.setCurrentIndex(widget.currentIndex()-1)
     
     def switchToQuestionScreen(self):
-        widget.addWidget(QuestionScreen())
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        total_time_available = self.spinBox.value()*60
+        if widget.count() <= 2:
+            widget.addWidget(QuestionScreen())
         widget.setCurrentIndex(widget.currentIndex()+1)
 
 
 class QuestionScreen(QtWidgets.QDialog):
+
     def __init__(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
         super(QuestionScreen, self).__init__()
         uic.loadUi('QuestionFrame.ui', self)
-        # self.show()
-        # setGeometry(left, top, width, height)
         self.setFixedSize(666, 600)
         self.location_on_the_screen()
-  
 
         self.pushButton.clicked.connect(self.prevQuestion)
         self.pushButton_2.clicked.connect(self.nextQuestion)
+        self.pushButton_4.clicked.connect(self.switchToConfirmScreen)
         self.pushButton_5.clicked.connect(self.clearResponse)
 
-        self.presentQuestionIndex = 1
+        present_ques_index = 1
         
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_lcds)
 
         self.timer.start(1000)
-        self.total_time = 90*60
 
-        self.loadQuestion(self.presentQuestionIndex)
+        self.loadQuestion(present_ques_index)
         self.pushButton.setDisabled(True)
+
+        total_time_left = total_time_available
 
         
     def location_on_the_screen(self):
@@ -279,55 +294,79 @@ class QuestionScreen(QtWidgets.QDialog):
         self.move(x, y)
 
     def update_lcds(self):
-        self.total_time -= 1
-        if 15*60 <= self.total_time <= 45*60:
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+
+        total_time_left -= 1
+        if total_time_available*0.2 <= total_time_left <= total_time_available*0.45:
             bg_color = 'orange'
-        elif self.total_time < 15*60 :
+        elif total_time_left < total_time_available*0.2:
             bg_color = 'red'
-        elif self.total_time > 45*60:
+        elif total_time_left > total_time_available*0.45:
             bg_color = 'green'
         self.lcdNumber.setStyleSheet(f'background:{bg_color}')
-        self.lcdNumber.display(str(self.total_time//60) + ': ' + str(self.total_time%60))
+        self.lcdNumber.display(str(total_time_left//60) +
+                               ': ' + str(total_time_left % 60))
+        if total_time_left <= 1:
+            self.switchToConfirmScreen()
 
 
     def clearResponse(self):
-        necessary_data[self.presentQuestionIndex]['MarkedResponse'] = ''
-        self.responseCleanup(self.presentQuestionIndex)
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        
+        necessary_data[present_ques_index]['MarkedResponse'] = ''
+        self.responseCleanup(present_ques_index)
+        attempted_questions -= 1
 
 
     def prevQuestion(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
 
-        self.saveResponse(self.presentQuestionIndex)
+        self.saveResponse(present_ques_index)
         
-        self.presentQuestionIndex -= 1
-        if self.presentQuestionIndex == 1:
+        present_ques_index -= 1
+        if present_ques_index == 1:
             self.pushButton.setDisabled(True)
         else:
             self.pushButton.setDisabled(False)
         
-        self.loadQuestion(self.presentQuestionIndex)
+        self.loadQuestion(present_ques_index)
+
+        self.pushButton_2.setText('Next')
 
 
     def nextQuestion(self):
-        self.pushButton.setDisabled(False)
-        
-        self.saveResponse(self.presentQuestionIndex)
-            
-        self.presentQuestionIndex += 1
-        
-        self.loadQuestion(self.presentQuestionIndex)
-    
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
 
+        if self.pushButton_2.text() != 'Submit':
+            self.pushButton.setDisabled(False)
+            self.saveResponse(present_ques_index)
+            present_ques_index += 1
+            self.loadQuestion(present_ques_index)
+            if present_ques_index == max_questions:
+                self.pushButton_2.setText('Submit')
+        else:
+            self.switchToConfirmScreen()
+    
+    def switchToConfirmScreen(self):
+        if widget.count() <= 3:
+            widget.addWidget(ConfirmScreen())
+        widget.setCurrentIndex(widget.currentIndex()+1)
+    
+    
     def saveResponse(self, idx):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        
         for i, button in enumerate(self.buttonGroup.buttons()):
             if button.isChecked():
                 necessary_data[idx]['MarkedResponse'] = 'A' if i == 0 else \
                                                        ('B' if i == 1 else \
                                                        ('C' if i == 2 else 'D'))
+                attempted_questions += 1
                 break
 
     
     def responseCleanup(self, idx):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
 
         mresponse = necessary_data[idx]['MarkedResponse'].upper()
         
@@ -354,6 +393,83 @@ class QuestionScreen(QtWidgets.QDialog):
 
         self.responseCleanup(idx)
         
+
+class ConfirmScreen(QtWidgets.QDialog):
+    def __init__(self):
+        super(ConfirmScreen, self).__init__()
+        uic.loadUi('ConfirmFrame.ui', self)
+
+        self.pushButton.clicked.connect(self.switchToQuestionScreen)
+        self.pushButton_2.clicked.connect(self.viewSaveResult)
+
+        self.label_5.hide()
+        self.label_7.hide()
+        self.label_8.hide()
+        self.lcdNumber.hide()
+        self.lcdNumber_3.hide()
+        self.lcdNumber_4.hide()
+
+        if total_time_left <= 1:
+            self.pushButton.setDisabled(True)
+
+    def switchToQuestionScreen(self):
+        # widget.addWidget(QuestionScreen())
+        widget.setCurrentIndex(widget.currentIndex()-1)
+    
+    def viewSaveResult(self):
+        if 'submit' in self.pushButton_2.text().lower() :
+            marking_scheme = [mainwindow.spinBox.value(), mainwindow.doubleSpinBox.value(), 0]
+            response_data  =  self.analyseResponses()
+            marks_acquired = sum([x*y for x,y in zip(response_data, marking_scheme)])
+            self.label_5.show()
+            self.label_7.show()
+            self.label_8.show()
+            self.lcdNumber.show()
+            self.lcdNumber_3.show()
+            self.lcdNumber_4.show()
+            marking_scale = max_questions*mainwindow.spinBox.value()
+
+            if marks_acquired <= marking_scale*0.4:
+                bg_color = 'red'
+            elif marking_scale*0.4 < marks_acquired < marking_scale*0.55 :
+                bg_color = 'orange'
+            elif marks_acquired :
+                bg_color = 'green'
+            self.lcdNumber.setStyleSheet(f'background:{bg_color}')
+            self.lcdNumber.display(marks_acquired)
+            
+            self.lcdNumber_5.display(response_data[0]+response_data[1])
+
+            self.lcdNumber_3.display(response_data[0])
+            self.lcdNumber_3.setStyleSheet(f'background:green')
+            self.lcdNumber_4.display(response_data[1])
+            self.lcdNumber_4.setStyleSheet(f'background:red')
+            self.pushButton_2.setText('Save Attempt Data')
+        else:
+            name = QFileDialog.getSaveFileName(self, 'Save File')
+            if not name.endswith('.json'):
+                if '.' in name:
+                    name = name[:name.index('.')] + '.json'
+                else:
+                    name += '.json'
+            with open(name, 'w') as outfile:
+                json.dump(json.dumps(necessary_data), outfile)
+
+    def analyseResponses(self):
+        correct = 0
+        wrong = 0
+        skipped = 0
+        for data in necessary_data:
+            if necessary_data[data]['MarkedResponse'].upper() in ['A', 'B', 'C', 'D']:
+                if necessary_data[data]['MarkedResponse'].upper() == necessary_data[data]['Answer'].upper():
+                    correct += 1
+                else:
+                    wrong += 1
+            else:
+                skipped += 1
+        
+        return [correct, wrong, skipped]
+
 
 
 app = QtWidgets.QApplication(sys.argv)
