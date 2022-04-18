@@ -5,6 +5,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import sys
 import fitz, re, json
+from datetime import datetime
 
 
 # Question number : [{Question : '', Options : '', Answer: '', MarkedResponse : '', TimeTaken : ''}]
@@ -396,11 +397,14 @@ class QuestionScreen(QtWidgets.QDialog):
 
 class ConfirmScreen(QtWidgets.QDialog):
     def __init__(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        
         super(ConfirmScreen, self).__init__()
         uic.loadUi('ConfirmFrame.ui', self)
 
         self.pushButton.clicked.connect(self.switchToQuestionScreen)
         self.pushButton_2.clicked.connect(self.viewSaveResult)
+        widget.currentChanged.connect(self.update_lcds)
 
         self.label_5.hide()
         self.label_7.hide()
@@ -408,15 +412,45 @@ class ConfirmScreen(QtWidgets.QDialog):
         self.lcdNumber.hide()
         self.lcdNumber_3.hide()
         self.lcdNumber_4.hide()
+        self.lcdNumber_6.display(max_questions)
 
         if total_time_left <= 1:
             self.pushButton.setDisabled(True)
+
+    def update_lcds(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        
+        if attempted_questions < 0.4*max_questions:
+            bg_color = 'red'
+        elif 0.4*max_questions <= attempted_questions <= 0.75*max_questions:
+            bg_color = 'orange'
+        else:
+            bg_color = 'green'
+        
+        self.lcdNumber_5.setStyleSheet(f'background:{bg_color}')
+        self.lcdNumber_5.display(attempted_questions)
+
+        if total_time_available*0.1 <= total_time_left <= total_time_available*0.25:
+            bg_color = 'orange'
+        elif total_time_left < total_time_available*0.1:
+            bg_color = 'red'
+        elif total_time_left > total_time_available*0.25:
+            bg_color = 'green'
+        self.lcdNumber_2.setStyleSheet(f'background:{bg_color}')
+        self.lcdNumber_2.display(str((total_time_available-total_time_left)//60) +
+                                 ': ' + str((total_time_available-total_time_left) % 60))
+
+        if total_time_left <= 1:
+            self.pushButton.setDisabled(True)
+
+
 
     def switchToQuestionScreen(self):
         # widget.addWidget(QuestionScreen())
         widget.setCurrentIndex(widget.currentIndex()-1)
     
     def viewSaveResult(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
         if 'submit' in self.pushButton_2.text().lower() :
             marking_scheme = [mainwindow.spinBox.value(), mainwindow.doubleSpinBox.value(), 0]
             response_data  =  self.analyseResponses()
@@ -445,15 +479,28 @@ class ConfirmScreen(QtWidgets.QDialog):
             self.lcdNumber_4.display(response_data[1])
             self.lcdNumber_4.setStyleSheet(f'background:red')
             self.pushButton_2.setText('Save Attempt Data')
+            self.pushButton.setDisabled(True)
         else:
-            name = QFileDialog.getSaveFileName(self, 'Save File')
-            if not name.endswith('.json'):
-                if '.' in name:
-                    name = name[:name.index('.')] + '.json'
+            name = QFileDialog.getSaveFileName(self, 'Save Attempt Data', '', 'JSON (*.json)')
+            if not name[0].endswith('.json'):
+                if '.' in name[0]:
+                    name = name[0][:name.index('.')] + '.json'
                 else:
-                    name += '.json'
+                    if name[0]:
+                        name = name[0] + '.json'
+                    else:
+                        curr_time = str(datetime.now()).replace('-','').replace(':','_').replace(' ','_')
+                        if '.' in curr_time:
+                            curr_time = curr_time[:curr_time.index('.')]
+                        name = 'attempt_data_' + curr_time + '.json'
+            else:
+                name = name[0]
             with open(name, 'w') as outfile:
-                json.dump(json.dumps(necessary_data), outfile)
+                # json.dump(json.dumps(json.loads(necessary_data), indent=4, separators=(',', ': ')), outfile,
+                #           indent=4, separators=(',', ': '))
+                # json.dump(json.dumps(necessary_data, indent=4, separators=(', ', ': ')), 
+                json.dump(json.dumps(necessary_data), 
+                                outfile, indent=4, separators=(', ', ': '))
 
     def analyseResponses(self):
         correct = 0
