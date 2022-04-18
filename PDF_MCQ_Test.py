@@ -8,19 +8,19 @@ import fitz, re, json
 from datetime import datetime
 
 
-# Question number : [{Question : '', Options : '', Answer: '', MarkedResponse : '', TimeTaken : ''}]
 necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
-                     'TimeTaken':'', 'Comments': '', 'Explanation' : ''} for x in range(1,101)}
+                     'TimeTaken':0, 'Comments': '', 'Explanation' : ''} for x in range(1,101)}
 
 max_questions           = 0
 total_time_available    = 0
 total_time_left         = 0
 attempted_questions     = 0
 present_ques_index      = 0
+quiz_type               = 0
 
 class MainScreen(QtWidgets.QDialog):
     def __init__(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         super(MainScreen, self).__init__()
         uic.loadUi('QuizMasterFront.ui', self)
@@ -37,14 +37,14 @@ class MainScreen(QtWidgets.QDialog):
         
         # self.continuebutton = self.findChild(
         #     QtWidgets.QPushButton, 'pushButton_4')
-        self.pushButton_4.clicked.connect(self.switchToSecondFrame)
+        self.pushButton_4.clicked.connect(self.switchToNextFrame)
         self.pushButton_4.setDisabled(True)
 
         self.txtbrwsr_newq = ''
         self.txtbrwsr_oldq = ''
     
     def getFile(self, ptr):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         fileformat = 'json' if 'old' in self.buttonGroup.checkedButton().text().lower() else 'pdf'
         fname = QFileDialog.getOpenFileName(self, 'Open file',
@@ -64,7 +64,7 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(True)
     
     def selectQuizType(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         if 'old' in self.buttonGroup.checkedButton().text().lower() :
             self.txtbrwsr_newq = self.textBrowser.toPlainText()
             self.textBrowser.setText(self.txtbrwsr_oldq)
@@ -83,6 +83,7 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(False)
             else:
                 self.pushButton_4.setDisabled(True)
+            quiz_type = 1
 
         else:
             self.txtbrwsr_oldq = self.textBrowser.toPlainText()
@@ -104,7 +105,7 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(True)
 
     def selectSolutionType(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         selected_mode = self.buttonGroup_2.checkedButton().text().lower()
         # separate, end, after, marked
         if 'separate' not in selected_mode:
@@ -128,16 +129,25 @@ class MainScreen(QtWidgets.QDialog):
                 self.pushButton_4.setDisabled(True)
 
 
-    def switchToSecondFrame(self):
+    def switchToNextFrame(self):
+        global necessary_data, max_questions
+        if 'old' in self.buttonGroup.checkedButton().text().lower():
+            nextScreen = QuestionScreen
+            new_dict = json.loads(
+                               json.load(open(self.textBrowser.toPlainText())))
+            necessary_data = {int(x):y for (x,y) in zip(new_dict.keys(), new_dict.values())}
+            max_questions  = len(necessary_data)
+        else:
+            nextScreen = SecondScreen
         if widget.count() <= 1:
-            widget.addWidget(SecondScreen())
+            widget.addWidget(nextScreen())
         widget.setCurrentIndex(widget.currentIndex()+1)
 
 
 class SecondScreen(QtWidgets.QDialog):
     
     def __init__(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         super(SecondScreen, self).__init__()
         uic.loadUi('QuizMaster.ui', self)
         # self.show()
@@ -251,7 +261,7 @@ class SecondScreen(QtWidgets.QDialog):
         widget.setCurrentIndex(widget.currentIndex()-1)
     
     def switchToQuestionScreen(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         total_time_available = self.spinBox.value()*60
         if widget.count() <= 2:
             widget.addWidget(QuestionScreen())
@@ -261,7 +271,7 @@ class SecondScreen(QtWidgets.QDialog):
 class QuestionScreen(QtWidgets.QDialog):
 
     def __init__(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         super(QuestionScreen, self).__init__()
         uic.loadUi('QuestionFrame.ui', self)
         self.setFixedSize(666, 600)
@@ -274,10 +284,24 @@ class QuestionScreen(QtWidgets.QDialog):
 
         present_ques_index = 1
         
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_lcds)
+        if quiz_type == 1:
+            self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
+                                 ': ' + str(necessary_data[present_ques_index]['TimeTaken'] % 60))
+        
+            if necessary_data[present_ques_index]['TimeTaken']//60 == 1:
+                self.lcdNumber_2.setStyleSheet(f'background:orange')
+            elif necessary_data[present_ques_index]['TimeTaken']//60 > 1:
+                self.lcdNumber_2.setStyleSheet(f'background:red')
+            else:
+                self.lcdNumber_2.setStyleSheet(f'background:green')
+            
+            
+        else:
+            self.textBrowser_3.hide()
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.update_lcds)
 
-        self.timer.start(1000)
+            self.timer.start(1000)
 
         self.loadQuestion(present_ques_index)
         self.pushButton.setDisabled(True)
@@ -295,7 +319,7 @@ class QuestionScreen(QtWidgets.QDialog):
         self.move(x, y)
 
     def update_lcds(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         total_time_left -= 1
         if total_time_available*0.2 <= total_time_left <= total_time_available*0.45:
@@ -307,12 +331,24 @@ class QuestionScreen(QtWidgets.QDialog):
         self.lcdNumber.setStyleSheet(f'background:{bg_color}')
         self.lcdNumber.display(str(total_time_left//60) +
                                ': ' + str(total_time_left % 60))
+        
+        necessary_data[present_ques_index]['TimeTaken'] += 1
+        self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
+                                 ': ' + str(necessary_data[present_ques_index]['TimeTaken'] % 60))
+        
+        if necessary_data[present_ques_index]['TimeTaken']//60 == 1:
+            self.lcdNumber_2.setStyleSheet(f'background:orange')
+        elif necessary_data[present_ques_index]['TimeTaken']//60 > 1:
+            self.lcdNumber_2.setStyleSheet(f'background:red')
+        else:
+            self.lcdNumber_2.setStyleSheet(f'background:green')
+
         if total_time_left <= 1:
             self.switchToConfirmScreen()
 
 
     def clearResponse(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         necessary_data[present_ques_index]['MarkedResponse'] = ''
         self.responseCleanup(present_ques_index)
@@ -320,9 +356,9 @@ class QuestionScreen(QtWidgets.QDialog):
 
 
     def prevQuestion(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
-        self.saveResponse(present_ques_index)
+        self.saveResponse(present_ques_index) if quiz_type == 0 else None
         
         present_ques_index -= 1
         if present_ques_index == 1:
@@ -333,18 +369,32 @@ class QuestionScreen(QtWidgets.QDialog):
         self.loadQuestion(present_ques_index)
 
         self.pushButton_2.setText('Next')
+        self.pushButton_2.setDisabled(False)
 
 
     def nextQuestion(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+
+        if quiz_type == 1:
+            self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
+                                 ': ' + str(necessary_data[present_ques_index]['TimeTaken'] % 60))
+        
+            if necessary_data[present_ques_index]['TimeTaken']//60 == 1:
+                self.lcdNumber_2.setStyleSheet(f'background:orange')
+            elif necessary_data[present_ques_index]['TimeTaken']//60 > 1:
+                self.lcdNumber_2.setStyleSheet(f'background:red')
+            else:
+                self.lcdNumber_2.setStyleSheet(f'background:green')
+        
 
         if self.pushButton_2.text() != 'Submit':
             self.pushButton.setDisabled(False)
-            self.saveResponse(present_ques_index)
+            self.saveResponse(present_ques_index) if quiz_type == 0 else None
             present_ques_index += 1
             self.loadQuestion(present_ques_index)
             if present_ques_index == max_questions:
-                self.pushButton_2.setText('Submit')
+                self.pushButton_2.setText('Submit') if quiz_type == 0 else self.pushButton_2.setDisabled(True)
+            
         else:
             self.switchToConfirmScreen()
     
@@ -355,7 +405,7 @@ class QuestionScreen(QtWidgets.QDialog):
     
     
     def saveResponse(self, idx):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         for i, button in enumerate(self.buttonGroup.buttons()):
             if button.isChecked():
@@ -367,7 +417,7 @@ class QuestionScreen(QtWidgets.QDialog):
 
     
     def responseCleanup(self, idx):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         mresponse = necessary_data[idx]['MarkedResponse'].upper()
         
@@ -386,18 +436,50 @@ class QuestionScreen(QtWidgets.QDialog):
 
 
     def loadQuestion(self, idx=1):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+        
         self.textBrowser.setText(necessary_data[idx]['Question'])
         self.radioButton.setText(necessary_data[idx]['Options'][0])
         self.radioButton_2.setText(necessary_data[idx]['Options'][1])
         self.radioButton_3.setText(necessary_data[idx]['Options'][2])
         self.radioButton_4.setText(necessary_data[idx]['Options'][3])
 
-        self.responseCleanup(idx)
+        if quiz_type == 1:
+            button_mapping = {'A': self.radioButton, 'B': self.radioButton_2,
+                          'C': self.radioButton_3, 'D': self.radioButton_4}
+            
+            mresponse   = necessary_data[idx]['MarkedResponse'].upper()
+            answer      = necessary_data[idx]['Answer'].upper()
+
+            for button in list(button_mapping.values()):
+                button.setCheckable(True)
+                button.setChecked(False)
+                button.setStyleSheet("color : black")
+
+            if mresponse in ['A', 'B', 'C', 'D']:
+                button_mapping[mresponse].setStyleSheet("color : red")
+                button_mapping[mresponse].setChecked(True)
+
+            button_mapping[answer].setStyleSheet("color : green")
+            
+            for button in list(button_mapping.values()):
+                button.setCheckable(False)
+            
+            if len(necessary_data[idx]['Comments']) :
+                self.textBrowser_2.setText(necessary_data[idx]['Comments'])
+            else:
+                self.textBrowser_2.setText('Comments...')
+            
+            self.textBrowser_3.setText(necessary_data[idx]['Explanation'])
+
+
+        else:
+            self.responseCleanup(idx)
         
 
 class ConfirmScreen(QtWidgets.QDialog):
     def __init__(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         super(ConfirmScreen, self).__init__()
         uic.loadUi('ConfirmFrame.ui', self)
@@ -406,19 +488,23 @@ class ConfirmScreen(QtWidgets.QDialog):
         self.pushButton_2.clicked.connect(self.viewSaveResult)
         widget.currentChanged.connect(self.update_lcds)
 
-        self.label_5.hide()
-        self.label_7.hide()
-        self.label_8.hide()
-        self.lcdNumber.hide()
-        self.lcdNumber_3.hide()
-        self.lcdNumber_4.hide()
         self.lcdNumber_6.display(max_questions)
+        
+        if quiz_type == 0:
+            self.label_5.hide()
+            self.label_7.hide()
+            self.label_8.hide()
+            self.lcdNumber.hide()
+            self.lcdNumber_3.hide()
+            self.lcdNumber_4.hide()
+        else:
+            self.viewSaveResult(force_display = True)
 
         if total_time_left <= 1:
             self.pushButton.setDisabled(True)
 
     def update_lcds(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         if attempted_questions < 0.4*max_questions:
             bg_color = 'red'
@@ -449,9 +535,9 @@ class ConfirmScreen(QtWidgets.QDialog):
         # widget.addWidget(QuestionScreen())
         widget.setCurrentIndex(widget.currentIndex()-1)
     
-    def viewSaveResult(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index
-        if 'submit' in self.pushButton_2.text().lower() :
+    def viewSaveResult(self, force_display = False):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+        if 'submit' in self.pushButton_2.text().lower() or force_display:
             marking_scheme = [mainwindow.spinBox.value(), mainwindow.doubleSpinBox.value(), 0]
             response_data  =  self.analyseResponses()
             marks_acquired = sum([x*y for x,y in zip(response_data, marking_scheme)])
