@@ -174,7 +174,7 @@ class SecondScreen(QtWidgets.QDialog):
                                             file2_to_parse != file_to_parse else \
                                             [question_data_parsed]
 
-                file_being_parsed = 0
+                file_being_parsed   = 0
                 question_index      = 0
 
                 for data_parsed in parsing_list:
@@ -182,10 +182,31 @@ class SecondScreen(QtWidgets.QDialog):
                     max_questions       = max(max_questions, question_index)
                     question_index      = 0
                     file_being_parsed  += 1
+                    
+                    qo_format = {'iasbaba'      : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                                        '^[a-d]\)'],
+                                 
+                                 'visionias'    : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                                        '\([a-d]\)'],
+                                 
+                                 'rausias'      : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                                        '\([a-d]\)'],
+                                 
+                                 'forum'        : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                                        '^[a-d]\)'],
+                                 
+                                 'default'      : ['^[Q\.]{0,2}[ \t]?([0-9]{1,3})[\.\)]{1}[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                                   '^[\(]{0,1}[A-Da-d][\)\.]'],
+                                 }
+                    
+                    selected_format = 'default'
+                    
                     for page in range(data_parsed.page_count):
-                        page_text = re.sub('([0-9]\.)( ){0,5}\n( ){0,5}([A-Za-z\'\"`\‘\’])', r'\1 \4',
+                        page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
                                             data_parsed[page].get_text())
+                        
                         page_text = page_text.split('\n')
+
                         for page_line in page_text:
                             page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ')
 
@@ -213,21 +234,30 @@ class SecondScreen(QtWidgets.QDialog):
                                     or (page_line.__contains__('RAUSIAS'))\
                                     or (page_line.__contains__('IAS[ ]{0,5}Baba'))\
                                     or (page_line.__contains__('Total Marks :')):
+                                if page_line.__contains__('Vision IAS'):
+                                        selected_format = 'visionias'
+                                elif page_line.__contains__('RAUSIAS'):
+                                        selected_format = 'rausias'
+                                elif page_line.startswith('TLP Connect'):
+                                        selected_format = 'iasbaba'
+                                elif page_line.startswith('SFG 20'):
+                                        selected_format = 'forum'
                                 continue
                             
                             if file_being_parsed == 1:
                                 
-                                if not parsing_question and re.search('^[Q\.]{0,2}[ ]{0,2}[0-9]{1,3}[\.\)]{1}[ ]{0,2}[A-Za-z\'\"`\‘\’]+', page_line):
+                                if not parsing_question and re.search(qo_format[selected_format][0], page_line):
                                     parsing_question = 1
-                                    question_index += 1
+                                    question_index = re.search(qo_format[selected_format][0], page_line)
+                                    question_index = int(question_index.group(1))
                                     necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
                                                                                     + page_line
                                     continue
                                 elif not parsing_question and question_index and \
-                                    (not re.search('^[\(]{0,1}[A-Da-d][\)\.]', page_line)):
+                                    (not re.search(qo_format[selected_format][1], page_line)):
                                     necessary_data[question_index]['Options'][-1] += page_line + ' '
                                 
-                                if re.search('^[\(]{0,1}[A-Da-d][\)\.]', page_line):
+                                if re.search(qo_format[selected_format][1], page_line):
                                     parsing_question = 0
                                     necessary_data[question_index]['Options'].append(page_line)
                                 
@@ -255,6 +285,11 @@ class SecondScreen(QtWidgets.QDialog):
                                 elif question_index:
                                     necessary_data[question_index]['Explanation'] += page_line
 
+                    # print(selected_format)
+        # for data in necessary_data:
+        #     for options in necessary_data[data]:
+        #         print(necessary_data[data][options])
+        #     print()
         
     def switchToMainScreen(self):
         # widget.addWidget(mainwindow)
@@ -375,18 +410,6 @@ class QuestionScreen(QtWidgets.QDialog):
     def nextQuestion(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
-        if quiz_type == 1:
-            self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
-                                 ': ' + str(necessary_data[present_ques_index]['TimeTaken'] % 60))
-        
-            if necessary_data[present_ques_index]['TimeTaken']//60 == 1:
-                self.lcdNumber_2.setStyleSheet(f'background:orange')
-            elif necessary_data[present_ques_index]['TimeTaken']//60 > 1:
-                self.lcdNumber_2.setStyleSheet(f'background:red')
-            else:
-                self.lcdNumber_2.setStyleSheet(f'background:green')
-        
-
         if self.pushButton_2.text() != 'Submit':
             self.pushButton.setDisabled(False)
             self.saveResponse(present_ques_index) if quiz_type == 0 else None
@@ -439,12 +462,30 @@ class QuestionScreen(QtWidgets.QDialog):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         self.textBrowser.setText(necessary_data[idx]['Question'])
-        self.radioButton.setText(necessary_data[idx]['Options'][0])
-        self.radioButton_2.setText(necessary_data[idx]['Options'][1])
-        self.radioButton_3.setText(necessary_data[idx]['Options'][2])
-        self.radioButton_4.setText(necessary_data[idx]['Options'][3])
 
+        if len(necessary_data[idx]['Options']) == 4:
+            self.radioButton.setText(necessary_data[idx]['Options'][0])
+            self.radioButton_2.setText(necessary_data[idx]['Options'][1])
+            self.radioButton_3.setText(necessary_data[idx]['Options'][2])
+            self.radioButton_4.setText(necessary_data[idx]['Options'][3])
+        else:
+            self.radioButton.setText('')
+            self.radioButton_2.setText('')
+            self.radioButton_3.setText('')
+            self.radioButton_4.setText('')
+        
         if quiz_type == 1:
+            self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
+                                 ': ' + str(necessary_data[present_ques_index]['TimeTaken'] % 60))
+        
+            if necessary_data[present_ques_index]['TimeTaken']//60 == 1:
+                self.lcdNumber_2.setStyleSheet(f'background:orange')
+            elif necessary_data[present_ques_index]['TimeTaken']//60 > 1:
+                self.lcdNumber_2.setStyleSheet(f'background:red')
+            else:
+                self.lcdNumber_2.setStyleSheet(f'background:green')
+            
+
             button_mapping = {'A': self.radioButton, 'B': self.radioButton_2,
                           'C': self.radioButton_3, 'D': self.radioButton_4}
             
@@ -459,11 +500,11 @@ class QuestionScreen(QtWidgets.QDialog):
             if mresponse in ['A', 'B', 'C', 'D']:
                 button_mapping[mresponse].setStyleSheet("color : red")
                 button_mapping[mresponse].setChecked(True)
+            else:
+                for button in list(button_mapping.values()):
+                    button.setCheckable(False)
 
             button_mapping[answer].setStyleSheet("color : green")
-            
-            for button in list(button_mapping.values()):
-                button.setCheckable(False)
             
             if len(necessary_data[idx]['Comments']) :
                 self.textBrowser_2.setText(necessary_data[idx]['Comments'])
