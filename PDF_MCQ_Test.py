@@ -199,6 +199,18 @@ class SecondScreen(QtWidgets.QDialog):
                                                    '^[\(]{0,1}[A-Da-d][\)\.]'],
                                  }
                     
+                    sol_format = {
+                                 'iasbaba'      : '^Q\.([0-9]+)\)[ ]?Solution',
+                                 
+                                 'visionias'    : '^Q[ ]?([0-9]+)\.',
+                                 
+                                 'rausias'      : '^([0-9]+)\.[ ]?Answer',
+                                 
+                                #  'forum'        : '^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                 
+                                 'default'      : 'Q\.([0-9]+)[ ]?\)[]+Solution[] +\([A-Da-d]\)$',
+                                }
+                    
                     selected_format = 'default'
                     
                     for page in range(data_parsed.page_count):
@@ -266,13 +278,15 @@ class SecondScreen(QtWidgets.QDialog):
                                                                                     + page_line
                                 
                             else:
-                                if re.search('^Q\.[0-9]+\)[ ]+Solution', page_line) or \
-                                    re.search('Q\.[0-9]+\)[ ]+Solution[ ]+\([A-Da-d]\)$', page_line) or \
-                                    re.search('^Correct[ ]+Answer', page_line) or \
-                                    re.search('^Q[ ]{0,5}[0-9]+\.', page_line) or \
-                                    re.search('Q[ ]{0,5}[0-9]+\.[A-Da-d]$', page_line) or \
-                                    re.search('^[0-9]+\.[ ]+Answer', page_line):
-                                    question_index += 1
+
+                                if re.search(sol_format[selected_format], page_line):
+                                    
+                                    question_index = re.search(
+                                        sol_format[selected_format], page_line)
+                                    
+                                    question_index = int(
+                                        question_index.group(1))
+
                                     if page_line[-1].lower() in ['a','b','c','d']:
                                         correct_answer = page_line[-1].lower()
                                     elif page_line[-2].lower() in ['a', 'b', 'c', 'd']:
@@ -504,7 +518,8 @@ class QuestionScreen(QtWidgets.QDialog):
                 for button in list(button_mapping.values()):
                     button.setCheckable(False)
 
-            button_mapping[answer].setStyleSheet("color : green")
+            if answer in ['A', 'B', 'C', 'D']:
+                button_mapping[answer].setStyleSheet("color : green")
             
             if len(necessary_data[idx]['Comments']) :
                 self.textBrowser_2.setText(necessary_data[idx]['Comments'])
