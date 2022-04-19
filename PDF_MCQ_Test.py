@@ -453,8 +453,8 @@ class QuestionScreen(QtWidgets.QDialog):
                 attempted_questions += 1
                 break
         
-        if self.textBrowser.toPlainText() != 'Comments...':
-            necessary_data[idx]['Comments'] = self.textBrowser.toPlainText()
+        if self.textBrowser_2.toPlainText() != 'Comments...':
+            necessary_data[idx]['Comments'] = self.textBrowser_2.toPlainText()
 
     
     def responseCleanup(self, idx):
