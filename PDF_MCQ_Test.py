@@ -638,9 +638,6 @@ class ConfirmScreen(QtWidgets.QDialog):
             else:
                 name = name[0]
             with open(name, 'w') as outfile:
-                # json.dump(json.dumps(json.loads(necessary_data), indent=4, separators=(',', ': ')), outfile,
-                #           indent=4, separators=(',', ': '))
-                # json.dump(json.dumps(necessary_data, indent=4, separators=(', ', ': ')), 
                 json.dump(json.dumps(necessary_data), 
                                 outfile, indent=4, separators=(', ', ': '))
 
