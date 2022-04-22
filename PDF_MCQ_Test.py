@@ -326,12 +326,26 @@ class QuestionScreen(QtWidgets.QDialog):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         super(QuestionScreen, self).__init__()
         uic.loadUi('QuestionFrame.ui', self)
-        self.setFixedSize(666, 600)
+        self.setFixedSize(700, 600)
         
         self.pushButton.clicked.connect(self.prevQuestion)
         self.pushButton_2.clicked.connect(self.nextQuestion)
         self.pushButton_4.clicked.connect(self.switchToConfirmScreen)
         self.pushButton_5.clicked.connect(self.clearResponse)
+        self.listWidget.itemDoubleClicked.connect(self.moveToQuestion)
+
+        for data in necessary_data:
+            if len(necessary_data[data]['Question']) > 2:
+                break_idx = min(55, max(necessary_data[data]['Question'].find('\n',5), len(necessary_data[data]['Question'])))
+                self.listWidget.addItem(necessary_data[data]['Question'][:break_idx])
+        
+        # if quiz_type == 1:
+        #     for item_idx in range(self.listWidget.count()):
+        #         if necessary_data[item_idx+1]['Answer'].lower() == necessary_data[item_idx+1]['MarkedResponse'].lower():
+        #             self.listWidget.item(item_idx).setStyleSheet("color : green")
+        #         elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
+        #             self.listWidget.item(item_idx).setStyleSheet("color : red")
+
 
         present_ques_index = 1
         
@@ -348,7 +362,7 @@ class QuestionScreen(QtWidgets.QDialog):
             
         else:
             self.textBrowser_3.hide()
-            self.textBrowser_2.resize(640, 130)
+            self.textBrowser_2.resize(675, 130)
             self.textBrowser_2.setText('Comments...')
             self.timer = QTimer()
             self.timer.timeout.connect(self.update_lcds)
@@ -388,6 +402,12 @@ class QuestionScreen(QtWidgets.QDialog):
 
         if total_time_left <= 1:
             self.switchToConfirmScreen()
+
+
+    def moveToQuestion(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+        present_ques_index = self.listWidget.currentRow()+1
+        self.loadQuestion(present_ques_index)
 
 
     def clearResponse(self):
@@ -545,6 +565,11 @@ class ConfirmScreen(QtWidgets.QDialog):
         widget.currentChanged.connect(self.update_lcds)
 
         self.lcdNumber_6.display(max_questions)
+
+        for data in necessary_data:
+            if len(necessary_data[data]['Question']) > 2:
+                break_idx = min(55, max(necessary_data[data]['Question'].find('\n',5), len(necessary_data[data]['Question'])))
+                self.listWidget.addItem(necessary_data[data]['Question'][:break_idx])
         
         if quiz_type == 0:
             self.label_5.hide()
