@@ -18,6 +18,36 @@ attempted_questions     = 0
 present_ques_index      = 0
 quiz_type               = 0
 
+qo_format = {'iasbaba'      : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                                        '^[a-d]\)'],
+                                 
+             'visionias'    : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                    '\([a-d]\)'],
+                                 
+             'rausias'      : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                    '\([a-d]\)'],
+                                 
+             'forum'        : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+', 
+                                    '^[a-d]\)'],
+                                 
+             'default'      : ['^[Q\.]{0,2}[ \t]?([0-9]{1,3})[\.\)]{1}[ \t]?[A-Za-z\'\"`\‘\’]+',
+                               '^[\(]{0,1}[A-Da-d][\)\.]'],
+            }
+                    
+sol_format = {
+             'iasbaba'      : 'Q\.([0-9]+)\)[ ]?Solution',
+
+             'visionias'    : 'Q[ ]?([0-9]+)\.',
+                                 
+             'rausias'      : '([0-9]+)\.[ ]?Answer',
+                                 
+            #  'forum'        : 'Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                 
+             'default'      : 'Q\.([0-9]+)[ ]?\)[]+Solution[] +\([A-Da-d]\)$',
+            }
+
+selected_format = 'default'
+
 class MainScreen(QtWidgets.QDialog):
     def __init__(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
@@ -152,7 +182,7 @@ class MainScreen(QtWidgets.QDialog):
 class SecondScreen(QtWidgets.QDialog):
     
     def __init__(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type, selected_format
         super(SecondScreen, self).__init__()
         uic.loadUi('QuizMaster.ui', self)
         # self.show()
@@ -187,36 +217,6 @@ class SecondScreen(QtWidgets.QDialog):
                     max_questions       = max(max_questions, question_index)
                     question_index      = 0
                     file_being_parsed  += 1
-                    
-                    qo_format = {'iasbaba'      : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
-                                                        '^[a-d]\)'],
-                                 
-                                 'visionias'    : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
-                                                        '\([a-d]\)'],
-                                 
-                                 'rausias'      : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
-                                                        '\([a-d]\)'],
-                                 
-                                 'forum'        : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+', 
-                                                        '^[a-d]\)'],
-                                 
-                                 'default'      : ['^[Q\.]{0,2}[ \t]?([0-9]{1,3})[\.\)]{1}[ \t]?[A-Za-z\'\"`\‘\’]+',
-                                                   '^[\(]{0,1}[A-Da-d][\)\.]'],
-                                 }
-                    
-                    sol_format = {
-                                 'iasbaba'      : 'Q\.([0-9]+)\)[ ]?Solution',
-                                 
-                                 'visionias'    : 'Q[ ]?([0-9]+)\.',
-                                 
-                                 'rausias'      : '([0-9]+)\.[ ]?Answer',
-                                 
-                                #  'forum'        : 'Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
-                                 
-                                 'default'      : 'Q\.([0-9]+)[ ]?\)[]+Solution[] +\([A-Da-d]\)$',
-                                }
-                    
-                    selected_format = 'default'
                     
                     for page in range(data_parsed.page_count):
                         page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
@@ -368,7 +368,7 @@ class QuestionScreen(QtWidgets.QDialog):
             self.textBrowser_2.resize(675, 130)
             self.textBrowser_2.setText('Comments...')
             self.timer = QTimer()
-            self.timer.timeout.connect(self.update_lcds)
+            self.timer.timeout.connect(self.update_lcds) if total_time_available else None
 
             self.timer.start(1000)
 
@@ -409,7 +409,22 @@ class QuestionScreen(QtWidgets.QDialog):
 
     def moveToQuestion(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
-        present_ques_index = self.listWidget.currentRow()+1
+
+        self.saveResponse(present_ques_index) if quiz_type == 0 else None
+
+        question_index      = re.search(qo_format[selected_format][0], self.listWidget.currentItem().text())
+        present_ques_index  = int(question_index.group(1))
+
+        if present_ques_index == 1:
+            self.pushButton.setDisabled(True)
+        else:
+            self.pushButton.setDisabled(False)
+        
+        if present_ques_index == max_questions:
+            self.pushButton_2.setText('Submit') if quiz_type == 0 else self.pushButton_2.setDisabled(True)
+        else:
+            self.pushButton_2.setText('Next')
+
         self.loadQuestion(present_ques_index)
 
 
@@ -450,8 +465,10 @@ class QuestionScreen(QtWidgets.QDialog):
                 self.pushButton_2.setText('Submit') if quiz_type == 0 else self.pushButton_2.setDisabled(True)
             
         else:
+            self.saveResponse(present_ques_index) if quiz_type == 0 else None
             self.switchToConfirmScreen()
     
+
     def switchToConfirmScreen(self):
         if widget.count() <= 3:
             widget.addWidget(ConfirmScreen())
@@ -506,10 +523,6 @@ class QuestionScreen(QtWidgets.QDialog):
             present_ques_index += prevnext
             self.loadQuestion(idx+prevnext, prevnext)
             return
-            # self.radioButton.setText('')
-            # self.radioButton_2.setText('')
-            # self.radioButton_3.setText('')
-            # self.radioButton_4.setText('')
         
         if quiz_type == 1:
             self.lcdNumber_2.display(str(necessary_data[present_ques_index]['TimeTaken']//60) +
@@ -550,7 +563,6 @@ class QuestionScreen(QtWidgets.QDialog):
                 self.textBrowser_2.setText('Comments...')
             
             self.textBrowser_3.setText(necessary_data[idx]['Explanation'])
-
 
         else:
             self.responseCleanup(idx)
