@@ -225,7 +225,7 @@ class SecondScreen(QtWidgets.QDialog):
                         page_text = page_text.split('\n')
 
                         for page_line in page_text:
-                            page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n').lstrip('\\n')
+                            page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n')
 
                             if page_line.__contains__('I N S T R U C T I O N S '):
                                 break
@@ -336,8 +336,12 @@ class QuestionScreen(QtWidgets.QDialog):
 
         for data in necessary_data:
             if len(necessary_data[data]['Question']) > 2:
-                break_idx = min(55, max(necessary_data[data]['Question'].find('\n',5), len(necessary_data[data]['Question'])))
-                self.listWidget.addItem(necessary_data[data]['Question'][:break_idx])
+                if necessary_data[data]['Question'].find('\n',2) == -1:
+                    break_idx = min(55, len(necessary_data[data]['Question']))
+                else:
+                    break_idx = min(55, necessary_data[data]['Question'].find('\n',2))
+
+                self.listWidget.addItem(necessary_data[data]['Question'][1:][:break_idx-1])
         
         if quiz_type == 1:
             for item_idx in range(self.listWidget.count()):
@@ -345,7 +349,6 @@ class QuestionScreen(QtWidgets.QDialog):
                     self.listWidget.item(item_idx).setForeground(QBrush(QColor("green")))
                 elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
                     self.listWidget.item(item_idx).setForeground(QBrush(QColor("red")))
-
 
         present_ques_index = 1
         
@@ -568,8 +571,12 @@ class ConfirmScreen(QtWidgets.QDialog):
 
         for data in necessary_data:
             if len(necessary_data[data]['Question']) > 2:
-                break_idx = min(55, max(necessary_data[data]['Question'].find('\n',5), len(necessary_data[data]['Question'])))
-                self.listWidget.addItem(necessary_data[data]['Question'][:break_idx])
+                if necessary_data[data]['Question'].find('\n',2) == -1:
+                    break_idx = min(55, len(necessary_data[data]['Question']))
+                else:
+                    break_idx = min(55, necessary_data[data]['Question'].find('\n',2))
+
+                self.listWidget.addItem(necessary_data[data]['Question'][1:][:break_idx-1])
         
         if quiz_type == 0:
             self.label_5.hide()
