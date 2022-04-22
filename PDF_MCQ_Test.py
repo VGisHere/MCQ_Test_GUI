@@ -225,7 +225,7 @@ class SecondScreen(QtWidgets.QDialog):
                         page_text = page_text.split('\n')
 
                         for page_line in page_text:
-                            page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ')
+                            page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n').lstrip('\\n')
 
                             if page_line.__contains__('I N S T R U C T I O N S '):
                                 break
@@ -339,12 +339,12 @@ class QuestionScreen(QtWidgets.QDialog):
                 break_idx = min(55, max(necessary_data[data]['Question'].find('\n',5), len(necessary_data[data]['Question'])))
                 self.listWidget.addItem(necessary_data[data]['Question'][:break_idx])
         
-        # if quiz_type == 1:
-        #     for item_idx in range(self.listWidget.count()):
-        #         if necessary_data[item_idx+1]['Answer'].lower() == necessary_data[item_idx+1]['MarkedResponse'].lower():
-        #             self.listWidget.item(item_idx).setStyleSheet("color : green")
-        #         elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
-        #             self.listWidget.item(item_idx).setStyleSheet("color : red")
+        if quiz_type == 1:
+            for item_idx in range(self.listWidget.count()):
+                if necessary_data[item_idx+1]['Answer'].lower() == necessary_data[item_idx+1]['MarkedResponse'].lower():
+                    self.listWidget.item(item_idx).setForeground(QBrush(QColor("green")))
+                elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
+                    self.listWidget.item(item_idx).setForeground(QBrush(QColor("red")))
 
 
         present_ques_index = 1
@@ -647,6 +647,12 @@ class ConfirmScreen(QtWidgets.QDialog):
             self.lcdNumber_4.setStyleSheet(f'background:red')
             self.pushButton_2.setText('Save Attempt Data' if quiz_type == 0 else 'Restart GUI')
             self.pushButton.setDisabled(True if quiz_type == 0 else False)
+
+            for item_idx in range(self.listWidget.count()):
+                if necessary_data[item_idx+1]['Answer'].lower() == necessary_data[item_idx+1]['MarkedResponse'].lower():
+                    self.listWidget.item(item_idx).setForeground(QBrush(QColor("green")))
+                elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
+                    self.listWidget.item(item_idx).setForeground(QBrush(QColor("red")))
 
         elif 'attempt' in self.pushButton_2.text().lower():
             name = QFileDialog.getSaveFileName(self, 'Save Attempt Data', '', 'JSON (*.json)')
