@@ -4,7 +4,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import sys
-import fitz, re, json
+import fitz, re, json, os
 from datetime import datetime
 
 
@@ -205,13 +205,13 @@ class SecondScreen(QtWidgets.QDialog):
                                  }
                     
                     sol_format = {
-                                 'iasbaba'      : '^Q\.([0-9]+)\)[ ]?Solution',
+                                 'iasbaba'      : 'Q\.([0-9]+)\)[ ]?Solution',
                                  
-                                 'visionias'    : '^Q[ ]?([0-9]+)\.',
+                                 'visionias'    : 'Q[ ]?([0-9]+)\.',
                                  
-                                 'rausias'      : '^([0-9]+)\.[ ]?Answer',
+                                 'rausias'      : '([0-9]+)\.[ ]?Answer',
                                  
-                                #  'forum'        : '^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+                                #  'forum'        : 'Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
                                  
                                  'default'      : 'Q\.([0-9]+)[ ]?\)[]+Solution[] +\([A-Da-d]\)$',
                                 }
@@ -283,7 +283,7 @@ class SecondScreen(QtWidgets.QDialog):
                                                                                     + page_line
                                 
                             else:
-
+                                
                                 if re.search(sol_format[selected_format], page_line):
                                     
                                     question_index = re.search(
@@ -303,6 +303,9 @@ class SecondScreen(QtWidgets.QDialog):
                                 
                                 elif question_index:
                                     necessary_data[question_index]['Explanation'] += page_line
+            
+            # for data in necessary_data:
+            #     print(necessary_data[data],'\n')
 
         
     def switchToMainScreen(self):
@@ -324,8 +327,7 @@ class QuestionScreen(QtWidgets.QDialog):
         super(QuestionScreen, self).__init__()
         uic.loadUi('QuestionFrame.ui', self)
         self.setFixedSize(666, 600)
-        self.location_on_the_screen()
-
+        
         self.pushButton.clicked.connect(self.prevQuestion)
         self.pushButton_2.clicked.connect(self.nextQuestion)
         self.pushButton_4.clicked.connect(self.switchToConfirmScreen)
@@ -358,15 +360,6 @@ class QuestionScreen(QtWidgets.QDialog):
 
         total_time_left = total_time_available
 
-        
-    def location_on_the_screen(self):
-        ag = QDesktopWidget().availableGeometry()
-        sg = QDesktopWidget().screenGeometry()
-
-        widget = self.geometry()
-        x = ag.width() - widget.width()
-        y = 2 * ag.height() - sg.height() - widget.height()
-        self.move(x, y)
 
     def update_lcds(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
@@ -548,7 +541,7 @@ class ConfirmScreen(QtWidgets.QDialog):
         uic.loadUi('ConfirmFrame.ui', self)
 
         self.pushButton.clicked.connect(self.switchToQuestionScreen)
-        self.pushButton_2.clicked.connect(self.viewSaveResult)
+        self.pushButton_2.clicked.connect(self.viewSaveResult_Restart)
         widget.currentChanged.connect(self.update_lcds)
 
         self.lcdNumber_6.display(max_questions)
@@ -561,7 +554,7 @@ class ConfirmScreen(QtWidgets.QDialog):
             self.lcdNumber_3.hide()
             self.lcdNumber_4.hide()
         else:
-            self.viewSaveResult(force_display = True)
+            self.viewSaveResult_Restart(force_display = True)
 
         if total_time_left <= 1:
             self.pushButton.setDisabled(True if quiz_type == 0 else False)
@@ -598,7 +591,7 @@ class ConfirmScreen(QtWidgets.QDialog):
         # widget.addWidget(QuestionScreen())
         widget.setCurrentIndex(widget.currentIndex()-1)
     
-    def viewSaveResult(self, force_display = False):
+    def viewSaveResult_Restart(self, force_display = False):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         if 'submit' in self.pushButton_2.text().lower() or force_display:
             marking_scheme = [mainwindow.spinBox.value(), mainwindow.doubleSpinBox.value(), 0]
@@ -627,10 +620,10 @@ class ConfirmScreen(QtWidgets.QDialog):
             self.lcdNumber_3.setStyleSheet(f'background:green')
             self.lcdNumber_4.display(response_data[1])
             self.lcdNumber_4.setStyleSheet(f'background:red')
-            self.pushButton_2.setText('Save Attempt Data')
+            self.pushButton_2.setText('Save Attempt Data' if quiz_type == 0 else 'Restart GUI')
             self.pushButton.setDisabled(True if quiz_type == 0 else False)
 
-        else:
+        elif 'attempt' in self.pushButton_2.text().lower():
             name = QFileDialog.getSaveFileName(self, 'Save Attempt Data', '', 'JSON (*.json)')
             if not name[0].endswith('.json'):
                 if '.' in name[0]:
@@ -648,6 +641,11 @@ class ConfirmScreen(QtWidgets.QDialog):
             with open(name, 'w') as outfile:
                 json.dump(json.dumps(necessary_data), 
                                 outfile, indent=4, separators=(', ', ': '))
+            
+            self.pushButton_2.setText('Restart GUI')
+        
+        elif 'restart' in self.pushButton_2.text().lower():
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def analyseResponses(self):
         correct = 0
@@ -665,10 +663,10 @@ class ConfirmScreen(QtWidgets.QDialog):
         return [correct, wrong, skipped]
 
 
-
-app = QtWidgets.QApplication(sys.argv)
-mainwindow = MainScreen()
-widget = QtWidgets.QStackedWidget()
-widget.addWidget(mainwindow)
-widget.show()
-app.exec_()
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    mainwindow = MainScreen()
+    widget = QtWidgets.QStackedWidget()
+    widget.addWidget(mainwindow)
+    widget.show()
+    app.exec_()
