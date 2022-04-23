@@ -9,6 +9,12 @@ from datetime import datetime
 from time import sleep
 
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
 necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
                      'TimeTaken':0, 'Comments': '', 'Explanation' : ''} for x in range(1,101)}
 
@@ -19,32 +25,44 @@ attempted_questions     = 0
 present_ques_index      = 0
 quiz_type               = 0
 
-qo_format = {'iasbaba'      : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
+NOT_SUPPORTED = ['GSSCORE', 'INSIGHTSIAS', 'FORUMIAS']
+
+qo_format = {'iasbaba'      : ['^Q\.[ \t]*([0-9]{1,3})\)[ \t]*[A-Za-z\'\"`\‘\’]+',
                                                         '^[a-d]\)'],
                                  
-             'visionias'    : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
+             'visionias'    : ['^([0-9]{1,3})\.[ \t]*[A-Za-z\'\"`\‘\’]+', 
+                                    '\([a-d]\)'],
+             
+             'gsscore'      : ['^([0-9]{1,3})\.[ \t]*[A-Za-z\'\"`\‘\’]+', 
+                                    '\([a-d]\)'],
+             
+             'vajiram'      : ["^Q[ \t]*([0-9]{1,3})[ \t]*\.[ \t]*[A-Za-z\'\"`\‘\’]+",
+                                                        '^[a-dA-D][\)\.]'],
+                                 
+             'rausias'      : ['^([0-9]{1,3})\.[ \t]*[A-Za-z\'\"`\‘\’]+', 
                                     '\([a-d]\)'],
                                  
-             'rausias'      : ['^([0-9]{1,3})\.[ \t]?[A-Za-z\'\"`\‘\’]+', 
-                                    '\([a-d]\)'],
-                                 
-             'forum'        : ['^Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+', 
+             'forum'        : ['^Q\.[ \t]*([0-9]{1,3})\)[ \t]*[A-Za-z\'\"`\‘\’]+', 
                                     '^[a-d]\)'],
                                  
-             'default'      : ['^[Q\.]{0,2}[ \t]?([0-9]{1,3})[\.\)]{1}[ \t]?[A-Za-z\'\"`\‘\’]+',
+             'default'      : ['^[Q\.]{0,2}[ \t]*([0-9]{1,3})[\.\)]{1}[ \t]*[A-Za-z\'\"`\‘\’]+',
                                '^[\(]{0,1}[A-Da-d][\)\.]'],
             }
                     
 sol_format = {
-             'iasbaba'      : 'Q\.([0-9]+)\)[ ]?Solution',
+             'iasbaba'      : 'Q\.([0-9]+)\)[ \t]*Solution',
 
-             'visionias'    : 'Q[ ]?([0-9]+)\.',
+             'visionias'    : 'Q[ \t]*([0-9]+)\.',
+
+             'gsscore'      : '\nCorrect[ ]+Option:.*?\n([0-9]+)\.[ \t]*',
                                  
-             'rausias'      : '([0-9]+)\.[ ]?Answer',
+             'vajiram'      : r'[Q]?([0-9]+)\.[ \t]*(\bExplanation\b)?.*?(\bAnswer\b)',
+
+             'rausias'      : '([0-9]+)\.[ \t]*Answer',
                                  
             #  'forum'        : 'Q\.[ \t]?([0-9]{1,3})\)[ \t]?[A-Za-z\'\"`\‘\’]+',
                                  
-             'default'      : 'Q\.([0-9]+)[ ]?\)[]+Solution[] +\([A-Da-d]\)$',
+             'default'      : 'Q\.([0-9]+)[ \t]*\)[]+Solution[] +\([A-Da-d]\)$',
             }
 
 selected_format = 'default'
@@ -54,7 +72,8 @@ class MainScreen(QtWidgets.QDialog):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         super(MainScreen, self).__init__()
-        uic.loadUi('QuizMasterFront.ui', self)
+        frontscreen = resource_path('QuizMasterFront.ui')
+        uic.loadUi(frontscreen, self)
         # self.show()
 
         self.buttonGroup.buttonClicked.connect(self.selectQuizType)
@@ -187,7 +206,8 @@ class SecondScreen(QtWidgets.QDialog):
     def __init__(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type, selected_format
         super(SecondScreen, self).__init__()
-        uic.loadUi('QuizMaster.ui', self)
+        secondscreen = resource_path('QuizMaster.ui')
+        uic.loadUi(secondscreen, self)
         # self.show()
 
         self.timer = QTimer()
@@ -237,7 +257,7 @@ class SecondScreen(QtWidgets.QDialog):
                     for page_line in page_text:
                         page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n')
 
-                        if page_line.__contains__('I N S T R U C T I O N S '):
+                        if page_line.__contains__('I N S T R U C T I O N S'):
                             break
                         if len(page_line) <= 1 \
                                 or (page_line and len(page_line.rstrip()) < 3 and page_line[0].isdigit()) \
@@ -259,6 +279,10 @@ class SecondScreen(QtWidgets.QDialog):
                                 or (page_line.__contains__('Vision IAS'))\
                                 or (page_line.__contains__('Insights IAS'))\
                                 or (page_line.__contains__('RAUSIAS'))\
+                                or (page_line.__contains__('Vajiram'))\
+                                or (page_line.__contains__('VAJIRAM'))\
+                                or (page_line.__contains__('GS SCORE'))\
+                                or (page_line.__contains__('iasscore'))\
                                 or (page_line.__contains__('IAS[ ]{0,5}Baba'))\
                                 or (page_line.__contains__('Total Marks :')):
                             if page_line.__contains__('Vision IAS'):
@@ -269,22 +293,30 @@ class SecondScreen(QtWidgets.QDialog):
                                     selected_format = 'iasbaba'
                             elif page_line.startswith('SFG 20'):
                                     selected_format = 'forum'
+                            elif page_line.__contains__('Vajiram') or page_line.__contains__('VAJIRAM'):
+                                    selected_format = 'vajiram'
+                            elif page_line.__contains__('GS SCORE') or page_line.__contains__('iasscore'):
+                                    selected_format = 'gsscore'
+                            
                             continue
                             
                         if file_being_parsed == 1:
                                 
-                            if not parsing_question and re.search(qo_format[selected_format][0], page_line):
+                            # print(page_line, question_index, selected_format)
+                            if not parsing_question and re.search(qo_format.get(selected_format, 'default')[0], page_line):
                                 parsing_question = 1
-                                question_index = re.search(qo_format[selected_format][0], page_line)
+                                question_index = re.search(qo_format.get(selected_format, 'default')[0], page_line)
                                 question_index = int(question_index.group(1))
                                 necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
                                                                                 + page_line
                                 continue
+
                             elif not parsing_question and question_index and \
-                                (not re.search(qo_format[selected_format][1], page_line)):
+                                (not re.search(qo_format.get(selected_format, 'default')[1], page_line)):
                                 necessary_data[question_index]['Options'][-1] += page_line + ' '
-                                
-                            if re.search(qo_format[selected_format][1], page_line):
+
+
+                            if re.search(qo_format.get(selected_format, 'default')[1], page_line):
                                 parsing_question = 0
                                 necessary_data[question_index]['Options'].append(page_line)
                                 
@@ -293,11 +325,11 @@ class SecondScreen(QtWidgets.QDialog):
                                                                                 + page_line
                                 
                         else:
-                                
-                            if re.search(sol_format[selected_format], page_line):
+                            # print(page_line)
+                            if re.search(sol_format.get(selected_format, 'default'), page_line):
                                 
                                 question_index = re.search(
-                                    sol_format[selected_format], page_line)
+                                    sol_format.get(selected_format, 'default'), page_line)
                                 
                                 question_index = int(
                                     question_index.group(1))
@@ -340,7 +372,8 @@ class QuestionScreen(QtWidgets.QDialog):
     def __init__(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         super(QuestionScreen, self).__init__()
-        uic.loadUi('QuestionFrame.ui', self)
+        quescreen = resource_path('QuestionFrame.ui')
+        uic.loadUi(quescreen, self)
         self.setFixedSize(700, 600)
         
         self.pushButton.clicked.connect(self.prevQuestion)
@@ -430,7 +463,7 @@ class QuestionScreen(QtWidgets.QDialog):
 
         self.saveResponse(present_ques_index) if quiz_type == 0 else None
 
-        question_index      = re.search(qo_format[selected_format][0], self.listWidget.currentItem().text())
+        question_index      = re.search(qo_format.get(selected_format, 'default')[0], self.listWidget.currentItem().text())
         present_ques_index  = int(question_index.group(1))
 
         if present_ques_index == 1:
@@ -535,7 +568,7 @@ class QuestionScreen(QtWidgets.QDialog):
         self.buttonGroup.setExclusive(True)
 
 
-    def loadQuestion(self, idx=1, prevnext = 1):
+    def loadQuestion(self, idx=1, prevnext = 1, recurse_level = 0):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         self.textBrowser.setText(necessary_data[idx]['Question'])
@@ -545,9 +578,21 @@ class QuestionScreen(QtWidgets.QDialog):
             self.radioButton_2.setText(necessary_data[idx]['Options'][1])
             self.radioButton_3.setText(necessary_data[idx]['Options'][2])
             self.radioButton_4.setText(necessary_data[idx]['Options'][3])
+            self.listWidget.scrollToItem(self.listWidget.item(present_ques_index-1))
+            self.listWidget.item(present_ques_index-1).setSelected(True)
         else:
-            present_ques_index += prevnext
-            self.loadQuestion(idx+prevnext, prevnext)
+            if (present_ques_index < max_questions and prevnext == 1) or \
+                    (present_ques_index > 1 and prevnext == -1 ):
+                present_ques_index += prevnext
+                self.loadQuestion(idx+prevnext, prevnext, recurse_level+prevnext)
+            else:
+                if present_ques_index == 1 and prevnext == -1:
+                    present_ques_index -= recurse_level
+                    self.loadQuestion(present_ques_index, 1, 0)
+                elif present_ques_index == max_questions and prevnext == 1:
+                    present_ques_index -= recurse_level
+                    self.loadQuestion(present_ques_index, -1, 0)
+                    self.pushButton_2.setText('Submit') if quiz_type == 0 else self.pushButton_2.setDisabled(True)
             return
         
         if quiz_type == 1:
@@ -599,7 +644,8 @@ class ConfirmScreen(QtWidgets.QDialog):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
         
         super(ConfirmScreen, self).__init__()
-        uic.loadUi('ConfirmFrame.ui', self)
+        confirmscreen = resource_path('ConfirmFrame.ui')
+        uic.loadUi(confirmscreen, self)
 
         self.pushButton.clicked.connect(self.switchToQuestionScreen)
         self.pushButton_2.clicked.connect(self.viewSaveResult_Restart)
@@ -695,7 +741,8 @@ class ConfirmScreen(QtWidgets.QDialog):
 
             for item_idx in range(self.listWidget.count()):
                 if necessary_data[item_idx+1]['Answer'].lower() == necessary_data[item_idx+1]['MarkedResponse'].lower():
-                    self.listWidget.item(item_idx).setForeground(QBrush(QColor("green")))
+                    if necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
+                        self.listWidget.item(item_idx).setForeground(QBrush(QColor("green")))
                 elif necessary_data[item_idx+1]['MarkedResponse'].lower() in ['a', 'b', 'c', 'd']:
                     self.listWidget.item(item_idx).setForeground(QBrush(QColor("red")))
 
