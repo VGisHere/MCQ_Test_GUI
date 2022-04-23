@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import *
 import sys
 import fitz, re, json, os
 from datetime import datetime
+from time import sleep
 
 
 necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
@@ -180,12 +181,18 @@ class MainScreen(QtWidgets.QDialog):
 
 
 class SecondScreen(QtWidgets.QDialog):
+
+    progress_value = 0
     
     def __init__(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type, selected_format
         super(SecondScreen, self).__init__()
         uic.loadUi('QuizMaster.ui', self)
         # self.show()
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_progressbar)
+        self.timer.start(10)
 
         self.pushButton.clicked.connect(self.switchToMainScreen)
         self.pushButton_2.clicked.connect(self.switchToQuestionScreen)
@@ -197,116 +204,124 @@ class SecondScreen(QtWidgets.QDialog):
                             'separate' in sol_extraction_mode \
                             else file_to_parse
 
-        if file_to_parse.endswith('json'):
-            self.pushButton_2.setDisabled(True)
-            pass
-        else:
-            if 'separate' in mainwindow.buttonGroup_2.checkedButton().text().lower():
-                question_data_parsed = fitz.open(file_to_parse)
-                solution_data_parsed = fitz.open(file2_to_parse)
+        self.pushButton_2.setDisabled(True)
+
+        if 'separate' in mainwindow.buttonGroup_2.checkedButton().text().lower():
+            question_data_parsed = fitz.open(file_to_parse)
+            solution_data_parsed = fitz.open(file2_to_parse)
                 
-                parsing_list = [question_data_parsed, solution_data_parsed] if \
-                                            file2_to_parse != file_to_parse else \
-                                            [question_data_parsed]
+            parsing_list = [question_data_parsed, solution_data_parsed] if \
+                                        file2_to_parse != file_to_parse else \
+                                        [question_data_parsed]
 
-                file_being_parsed   = 0
+            file_being_parsed   = 0
+            question_index      = 0
+
+            for data_parsed in parsing_list:
+                parsing_question    = 0         # 0 for at options or parsing not started yet; 1 question being parsed
+                max_questions       = max(max_questions, question_index)
                 question_index      = 0
-
-                for data_parsed in parsing_list:
-                    parsing_question    = 0         # 0 for at options or parsing not started yet; 1 question being parsed
-                    max_questions       = max(max_questions, question_index)
-                    question_index      = 0
-                    file_being_parsed  += 1
+                file_being_parsed  += 1
+                self.progress_value = 50
                     
-                    for page in range(data_parsed.page_count):
-                        page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
-                                            data_parsed[page].get_text())
+                for page in range(data_parsed.page_count):
                         
-                        page_text = page_text.split('\n')
+                    self.progress_value += 1
+                    self.progress_value =  min(99, self.progress_value)
 
-                        for page_line in page_text:
-                            page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n')
+                    page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
+                                        data_parsed[page].get_text())
+                        
+                    page_text = page_text.split('\n')
 
-                            if page_line.__contains__('I N S T R U C T I O N S '):
-                                break
-                            if len(page_line) <= 1 \
-                                    or (page_line and len(page_line.rstrip()) < 3 and page_line[0].isdigit()) \
-                                    or (page_line.startswith('www.') and (page_line.endswith('com') or page_line.endswith('org')\
-                                                                            or page_line.endswith('in')))\
-                                    or (re.search('^Page [0-9]+$', page_line))\
-                                    or (page_line.endswith('P a g e') and page_line[0].isdigit())\
-                                    or (page_line.startswith('TLP Connect'))\
-                                    or (re.search('^20[0-9][0-9]$', page_line))\
-                                    or (page_line.__contains__('Prelims Test Series'))\
-                                    or (page_line.__contains__('Total Marks :'))\
-                                    or (page_line.__contains__('Forum Learning Centre: Delhi'))\
-                                    or (page_line.__contains__('Road, Patna, Bihar 800001'))\
-                                    or (page_line.__contains__('9821711605'))\
-                                    or (page_line.__contains__('DO  NOT  OPEN'))\
-                                    or (page_line.__contains__('Copyright © by Vision IAS'))\
-                                    or (page_line.__contains__('All rights are reserved. No part of this document'))\
-                                    or (page_line.__contains__('transmitted in any form or by any means, electronic,'))\
-                                    or (page_line.__contains__('Vision IAS'))\
-                                    or (page_line.__contains__('Insights IAS'))\
-                                    or (page_line.__contains__('RAUSIAS'))\
-                                    or (page_line.__contains__('IAS[ ]{0,5}Baba'))\
-                                    or (page_line.__contains__('Total Marks :')):
-                                if page_line.__contains__('Vision IAS'):
-                                        selected_format = 'visionias'
-                                elif page_line.__contains__('RAUSIAS'):
-                                        selected_format = 'rausias'
-                                elif page_line.startswith('TLP Connect'):
-                                        selected_format = 'iasbaba'
-                                elif page_line.startswith('SFG 20'):
-                                        selected_format = 'forum'
-                                continue
+                    for page_line in page_text:
+                        page_line = page_line.rstrip('\n').rstrip(' ').lstrip(' ').lstrip('\n')
+
+                        if page_line.__contains__('I N S T R U C T I O N S '):
+                            break
+                        if len(page_line) <= 1 \
+                                or (page_line and len(page_line.rstrip()) < 3 and page_line[0].isdigit()) \
+                                or (page_line.startswith('www.') and (page_line.endswith('com') or page_line.endswith('org')\
+                                                                        or page_line.endswith('in')))\
+                                or (re.search('^Page [0-9]+$', page_line))\
+                                or (page_line.endswith('P a g e') and page_line[0].isdigit())\
+                                or (page_line.startswith('TLP Connect'))\
+                                or (re.search('^20[0-9][0-9]$', page_line))\
+                                or (page_line.__contains__('Prelims Test Series'))\
+                                or (page_line.__contains__('Total Marks :'))\
+                                or (page_line.__contains__('Forum Learning Centre: Delhi'))\
+                                or (page_line.__contains__('Road, Patna, Bihar 800001'))\
+                                or (page_line.__contains__('9821711605'))\
+                                or (page_line.__contains__('DO  NOT  OPEN'))\
+                                or (page_line.__contains__('Copyright © by Vision IAS'))\
+                                or (page_line.__contains__('All rights are reserved. No part of this document'))\
+                                or (page_line.__contains__('transmitted in any form or by any means, electronic,'))\
+                                or (page_line.__contains__('Vision IAS'))\
+                                or (page_line.__contains__('Insights IAS'))\
+                                or (page_line.__contains__('RAUSIAS'))\
+                                or (page_line.__contains__('IAS[ ]{0,5}Baba'))\
+                                or (page_line.__contains__('Total Marks :')):
+                            if page_line.__contains__('Vision IAS'):
+                                    selected_format = 'visionias'
+                            elif page_line.__contains__('RAUSIAS'):
+                                    selected_format = 'rausias'
+                            elif page_line.startswith('TLP Connect'):
+                                    selected_format = 'iasbaba'
+                            elif page_line.startswith('SFG 20'):
+                                    selected_format = 'forum'
+                            continue
                             
-                            if file_being_parsed == 1:
+                        if file_being_parsed == 1:
                                 
-                                if not parsing_question and re.search(qo_format[selected_format][0], page_line):
-                                    parsing_question = 1
-                                    question_index = re.search(qo_format[selected_format][0], page_line)
-                                    question_index = int(question_index.group(1))
-                                    necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
-                                                                                    + page_line
-                                    continue
-                                elif not parsing_question and question_index and \
-                                    (not re.search(qo_format[selected_format][1], page_line)):
-                                    necessary_data[question_index]['Options'][-1] += page_line + ' '
+                            if not parsing_question and re.search(qo_format[selected_format][0], page_line):
+                                parsing_question = 1
+                                question_index = re.search(qo_format[selected_format][0], page_line)
+                                question_index = int(question_index.group(1))
+                                necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
+                                                                                + page_line
+                                continue
+                            elif not parsing_question and question_index and \
+                                (not re.search(qo_format[selected_format][1], page_line)):
+                                necessary_data[question_index]['Options'][-1] += page_line + ' '
                                 
-                                if re.search(qo_format[selected_format][1], page_line):
-                                    parsing_question = 0
-                                    necessary_data[question_index]['Options'].append(page_line)
+                            if re.search(qo_format[selected_format][1], page_line):
+                                parsing_question = 0
+                                necessary_data[question_index]['Options'].append(page_line)
                                 
-                                if parsing_question:
-                                    necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
-                                                                                    + page_line
+                            if parsing_question:
+                                necessary_data[question_index]['Question'] += ('\n' if page_line[0].isdigit() else ' ')\
+                                                                                + page_line
                                 
-                            else:
+                        else:
                                 
-                                if re.search(sol_format[selected_format], page_line):
-                                    
-                                    question_index = re.search(
-                                        sol_format[selected_format], page_line)
-                                    
-                                    question_index = int(
-                                        question_index.group(1))
+                            if re.search(sol_format[selected_format], page_line):
+                                
+                                question_index = re.search(
+                                    sol_format[selected_format], page_line)
+                                
+                                question_index = int(
+                                    question_index.group(1))
 
-                                    if page_line[-1].lower() in ['a','b','c','d']:
-                                        correct_answer = page_line[-1].lower()
-                                    elif page_line[-2].lower() in ['a', 'b', 'c', 'd']:
-                                        correct_answer = page_line[-2].lower()
-                                    else:
-                                        necessary_data[question_index]['Answer'] += page_line
-                                        continue
-                                    necessary_data[question_index]['Answer'] += correct_answer
+                                if page_line[-1].lower() in ['a','b','c','d']:
+                                    correct_answer = page_line[-1].lower()
+                                elif page_line[-2].lower() in ['a', 'b', 'c', 'd']:
+                                    correct_answer = page_line[-2].lower()
+                                else:
+                                    necessary_data[question_index]['Answer'] += page_line
+                                    continue
+                                necessary_data[question_index]['Answer'] += correct_answer
                                 
-                                elif question_index:
-                                    necessary_data[question_index]['Explanation'] += page_line
+                            elif question_index:
+                                necessary_data[question_index]['Explanation'] += page_line
             
+            self.progress_value = 100
+
             # for data in necessary_data:
             #     print(necessary_data[data],'\n')
 
+    def update_progressbar(self):
+        self.progressBar.setValue(self.progress_value)
+        if self.progress_value == 100 : self.pushButton_2.setDisabled(False)
         
     def switchToMainScreen(self):
         # widget.addWidget(mainwindow)
@@ -342,6 +357,9 @@ class QuestionScreen(QtWidgets.QDialog):
                     break_idx = min(55, necessary_data[data]['Question'].find('\n',2))
 
                 self.listWidget.addItem(necessary_data[data]['Question'][1:][:break_idx-1])
+            else:
+                self.listWidget.addItem(necessary_data[data]['Question'])
+                self.listWidget.item(self.listWidget.count()-1).setHidden(True)
         
         if quiz_type == 1:
             for item_idx in range(self.listWidget.count()):
@@ -428,18 +446,11 @@ class QuestionScreen(QtWidgets.QDialog):
         self.loadQuestion(present_ques_index)
 
 
-    def clearResponse(self):
-        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
-        
-        necessary_data[present_ques_index]['MarkedResponse'] = ''
-        self.responseCleanup(present_ques_index)
-        attempted_questions -= 1
-
-
     def prevQuestion(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
 
         self.saveResponse(present_ques_index) if quiz_type == 0 else None
+        self.listWidget.item(present_ques_index-1).setSelected(False)
         
         present_ques_index -= 1
         if present_ques_index == 1:
@@ -447,6 +458,8 @@ class QuestionScreen(QtWidgets.QDialog):
         else:
             self.pushButton.setDisabled(False)
         
+        self.listWidget.item(present_ques_index-1).setSelected(True)
+
         self.loadQuestion(present_ques_index, -1)
 
         self.pushButton_2.setText('Next')
@@ -459,7 +472,9 @@ class QuestionScreen(QtWidgets.QDialog):
         if self.pushButton_2.text() != 'Submit':
             self.pushButton.setDisabled(False)
             self.saveResponse(present_ques_index) if quiz_type == 0 else None
+            self.listWidget.item(present_ques_index-1).setSelected(False)
             present_ques_index += 1
+            self.listWidget.item(present_ques_index-1).setSelected(True)
             self.loadQuestion(present_ques_index, 1)
             if present_ques_index == max_questions:
                 self.pushButton_2.setText('Submit') if quiz_type == 0 else self.pushButton_2.setDisabled(True)
@@ -473,6 +488,16 @@ class QuestionScreen(QtWidgets.QDialog):
         if widget.count() <= 3:
             widget.addWidget(ConfirmScreen())
         widget.setCurrentIndex(widget.currentIndex()+1)
+
+
+    def clearResponse(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
+        
+        if necessary_data[present_ques_index]['MarkedResponse'].upper() in ['A','B','C','D']:
+            attempted_questions -= 1
+        necessary_data[present_ques_index]['MarkedResponse'] = ''
+        self.responseCleanup(present_ques_index)
+        self.listWidget.item(present_ques_index-1).setForeground(QBrush(QColor("black")))
     
     
     def saveResponse(self, idx):
@@ -480,10 +505,11 @@ class QuestionScreen(QtWidgets.QDialog):
         
         for i, button in enumerate(self.buttonGroup.buttons()):
             if button.isChecked():
+                attempted_questions += (1 if necessary_data[idx]['MarkedResponse'].upper() not in ['A', 'B', 'C', 'D'] else 0)
                 necessary_data[idx]['MarkedResponse'] = 'A' if i == 0 else \
                                                        ('B' if i == 1 else \
                                                        ('C' if i == 2 else 'D'))
-                attempted_questions += 1
+                self.listWidget.item(idx-1).setForeground(QBrush(QColor("cyan")))
                 break
         
         if self.textBrowser_2.toPlainText() != 'Comments...':
@@ -716,6 +742,7 @@ class ConfirmScreen(QtWidgets.QDialog):
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     mainwindow = MainScreen()
+    # mainwindow.setWindowFlags(mainwindow.windowFlags() & ~QtCore.Qt.WindowMaximizeButtonHint)
     widget = QtWidgets.QStackedWidget()
     widget.addWidget(mainwindow)
     widget.show()
