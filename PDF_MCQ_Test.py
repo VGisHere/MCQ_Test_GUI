@@ -374,13 +374,15 @@ class QuestionScreen(QtWidgets.QDialog):
         super(QuestionScreen, self).__init__()
         quescreen = resource_path('QuestionFrame.ui')
         uic.loadUi(quescreen, self)
-        self.setFixedSize(700, 600)
+        self.setFixedSize(875, 600)
         
         self.pushButton.clicked.connect(self.prevQuestion)
         self.pushButton_2.clicked.connect(self.nextQuestion)
         self.pushButton_4.clicked.connect(self.switchToConfirmScreen)
         self.pushButton_5.clicked.connect(self.clearResponse)
         self.listWidget.itemDoubleClicked.connect(self.moveToQuestion)
+
+        self.plainTextEdit.setReadOnly(True if quiz_type == 1 else False)
 
         for data in necessary_data:
             if len(necessary_data[data]['Question']) > 2:
@@ -416,8 +418,8 @@ class QuestionScreen(QtWidgets.QDialog):
             
         else:
             self.textBrowser_3.hide()
-            self.textBrowser_2.resize(675, 130)
-            self.textBrowser_2.setText('Comments...')
+            self.plainTextEdit.resize(845, 130)
+            self.plainTextEdit.setPlaceholderText('Comments...')
             self.timer = QTimer()
             self.timer.timeout.connect(self.update_lcds) if total_time_available else None
 
@@ -545,8 +547,8 @@ class QuestionScreen(QtWidgets.QDialog):
                 self.listWidget.item(idx-1).setForeground(QBrush(QColor("cyan")))
                 break
         
-        if self.textBrowser_2.toPlainText() != 'Comments...':
-            necessary_data[idx]['Comments'] = self.textBrowser_2.toPlainText()
+        if self.plainTextEdit.toPlainText() != 'Comments...':
+            necessary_data[idx]['Comments'] = self.plainTextEdit.toPlainText()
 
     
     def responseCleanup(self, idx):
@@ -580,6 +582,11 @@ class QuestionScreen(QtWidgets.QDialog):
             self.radioButton_4.setText(necessary_data[idx]['Options'][3])
             self.listWidget.scrollToItem(self.listWidget.item(present_ques_index-1))
             self.listWidget.item(present_ques_index-1).setSelected(True)
+            if necessary_data[idx]['Comments'] != '':
+                self.plainTextEdit.setPlainText(necessary_data[idx]['Comments'])
+            else:
+                self.plainTextEdit.setPlainText('')
+                self.plainTextEdit.setPlaceholderText('Comments...')
         else:
             if (present_ques_index < max_questions and prevnext == 1) or \
                     (present_ques_index > 1 and prevnext == -1 ):
@@ -629,9 +636,9 @@ class QuestionScreen(QtWidgets.QDialog):
                 button_mapping[answer].setStyleSheet("color : green")
             
             if len(necessary_data[idx]['Comments']) :
-                self.textBrowser_2.setText(necessary_data[idx]['Comments'])
+                self.plainTextEdit.setPlaceholderText(necessary_data[idx]['Comments'])
             else:
-                self.textBrowser_2.setText('Comments...')
+                self.plainTextEdit.setPlaceholderText('Comments...')
             
             self.textBrowser_3.setText(necessary_data[idx]['Explanation'])
 
