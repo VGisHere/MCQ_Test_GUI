@@ -4,7 +4,10 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import sys
-import fitz, re, json, os
+import fitz
+import pytesseract
+from PIL import Image
+import re, json, os
 from datetime import datetime
 from time import sleep
 
@@ -14,9 +17,10 @@ def resource_path(relative_path):
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
+MAX_QUESTIONS_NUM = 100
 
 necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
-                     'TimeTaken':0, 'Comments': '', 'Explanation' : ''} for x in range(1,101)}
+                     'TimeTaken':0, 'Comments': '', 'Explanation' : ''} for x in range(1,MAX_QUESTIONS_NUM+1)}
 
 max_questions           = 0
 total_time_available    = 0
@@ -201,7 +205,9 @@ class MainScreen(QtWidgets.QDialog):
 
 class SecondScreen(QtWidgets.QDialog):
 
-    progress_value = 0
+    progress_value  = 0
+    question_file   = ''
+    solution_file   = ''
     
     def __init__(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type, selected_format
@@ -212,26 +218,53 @@ class SecondScreen(QtWidgets.QDialog):
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_progressbar)
-        self.timer.start(10)
+        self.timer.start(100)
 
         self.pushButton.clicked.connect(self.switchToMainScreen)
         self.pushButton_2.clicked.connect(self.switchToQuestionScreen)
+        self.pushButton_2.setText('Parse Data')
+
+        widget.currentChanged.connect(self.check_file_update)
 
         sol_extraction_mode = mainwindow.buttonGroup_2.checkedButton().text().lower()
+        self.question_file  = mainwindow.textBrowser.toPlainText()
+        self.solution_file  = mainwindow.textBrowser_2.toPlainText() if \
+                                        'separate' in sol_extraction_mode \
+                                         else self.question_file
         
-        file_to_parse = mainwindow.textBrowser.toPlainText()
-        file2_to_parse = mainwindow.textBrowser_2.toPlainText() if \
-                            'separate' in sol_extraction_mode \
-                            else file_to_parse
+
+    def check_file_update(self):
+        global necessary_data
+
+        if self.question_file != mainwindow.textBrowser.toPlainText() or \
+            self.solution_file != mainwindow.textBrowser_2.toPlainText():
+
+            necessary_data = {x:{'Question':'', 'Options':[], 'Answer': '', 'MarkedResponse':'', \
+                     'TimeTaken':0, 'Comments': '', 'Explanation' : ''} for x in range(1,MAX_QUESTIONS_NUM+1)}
+            
+            self.progress_value = 0
+            self.update_progressbar()
+            self.pushButton_2.setText('Parse Data')
+            self.pushButton_2.setDisabled(False)
+
+            sol_extraction_mode = mainwindow.buttonGroup_2.checkedButton().text().lower()
+            self.question_file  = mainwindow.textBrowser.toPlainText()
+            self.solution_file  = mainwindow.textBrowser_2.toPlainText() if \
+                                        'separate' in sol_extraction_mode \
+                                         else self.question_file
+
+            
+    def parseRequiredData(self):
+        global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type, selected_format
 
         self.pushButton_2.setDisabled(True)
 
         if 'separate' in mainwindow.buttonGroup_2.checkedButton().text().lower():
-            question_data_parsed = fitz.open(file_to_parse)
-            solution_data_parsed = fitz.open(file2_to_parse)
+            question_data_parsed = fitz.open(self.question_file)
+            solution_data_parsed = fitz.open(self.solution_file)
                 
             parsing_list = [question_data_parsed, solution_data_parsed] if \
-                                        file2_to_parse != file_to_parse else \
+                                        self.question_file != self.solution_file else \
                                         [question_data_parsed]
 
             file_being_parsed   = 0
@@ -242,16 +275,35 @@ class SecondScreen(QtWidgets.QDialog):
                 max_questions       = max(max_questions, question_index)
                 question_index      = 0
                 file_being_parsed  += 1
-                self.progress_value = 50
+                self.progress_value = 50 if data_parsed == solution_data_parsed else 0
                     
                 for page in range(data_parsed.page_count):
                         
                     self.progress_value += 1
                     self.progress_value =  min(99, self.progress_value)
 
+                    self.update_progressbar()
+
                     page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
                                         data_parsed[page].get_text())
                         
+                    if not len(page_text):
+                        try:
+                            page_contents = data_parsed[page] # number of pages
+                            mat           = fitz.Matrix(2.25, 2.25)
+                            pix           = page_contents.get_pixmap(matrix = mat)
+                            output = f'temp_{page}_parsing.jpg'
+                            pix.save(output)
+                            
+                            page_text = re.sub('([0-9][\.\)])([ ]{0,5})\n([ ]{0,5})([A-Za-z\'\"`\‘\’])', r'\1 \4',
+                                                    str(((pytesseract.image_to_string(Image.open(output))))))
+
+                            os.remove(output)
+
+                        except:
+                            pass
+                        
+
                     page_text = page_text.split('\n')
 
                     for page_line in page_text:
@@ -272,7 +324,11 @@ class SecondScreen(QtWidgets.QDialog):
                                 or (page_line.__contains__('Forum Learning Centre: Delhi'))\
                                 or (page_line.__contains__('Road, Patna, Bihar 800001'))\
                                 or (page_line.__contains__('9821711605'))\
+                                or (page_line.__contains__('Contact[ ]*[:]?[ ]*[0-9]+'))\
+                                or (page_line.__contains__('Join Our Telegram Channel'))\
                                 or (page_line.__contains__('DO  NOT  OPEN'))\
+                                or (page_line.__contains__('@UpscMaterialsNotes'))\
+                                or (page_line.__contains__('@CivilServicePDF'))\
                                 or (page_line.__contains__('Copyright © by Vision IAS'))\
                                 or (page_line.__contains__('All rights are reserved. No part of this document'))\
                                 or (page_line.__contains__('transmitted in any form or by any means, electronic,'))\
@@ -358,13 +414,20 @@ class SecondScreen(QtWidgets.QDialog):
     def switchToMainScreen(self):
         # widget.addWidget(mainwindow)
         widget.setCurrentIndex(widget.currentIndex()-1)
-    
+
     def switchToQuestionScreen(self):
         global total_time_available, total_time_left, max_questions, attempted_questions, present_ques_index, quiz_type
-        total_time_available = self.spinBox.value()*60
-        if widget.count() <= 2:
-            widget.addWidget(QuestionScreen())
-        widget.setCurrentIndex(widget.currentIndex()+1)
+        if self.pushButton_2.text() == 'Parse Data':
+            self.pushButton_2.setText('Parsing...')
+            self.pushButton_2.setDisabled(True)
+            self.parseRequiredData()
+            self.pushButton_2.setText('Continue')
+            self.pushButton_2.setDisabled(False)
+        else:
+            total_time_available = self.spinBox.value()*60
+            if widget.count() <= 2:
+                widget.addWidget(QuestionScreen())
+            widget.setCurrentIndex(widget.currentIndex()+1)
 
 
 class QuestionScreen(QtWidgets.QDialog):
