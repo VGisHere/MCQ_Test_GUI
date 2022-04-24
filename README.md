@@ -1,7 +1,7 @@
 This GUI is primarily aimed for usage by UPSC aspirants. <br />
-However, that said, it can _work with any PDF that contains Questions and Answers in split files_ and support for fetching the questions and answers can be integrated to source code.
+However, that said, it can _work with any PDF that contains Questions and Answers in **split files**_ and support for fetching the questions and answers can be integrated to source code.
 <br />
-# Current features of GUI include -
+# Features of GUI include -
 > 1. Attempt time based mock papers.
 > 2. Add own comments (thought process) for question attempted.
 > 3. Navigator for quick navigation between questions.
@@ -10,22 +10,19 @@ However, that said, it can _work with any PDF that contains Questions and Answer
 
 <br />
 
-## _Features in pipeline_ -
-> 1. Support for Scanned PDF.
-> 2. Support for single file for Questions and Answers.
-> 3. Create .exe (and other respective extensions as per OS) for seamless experience.
-
 Hope you find this useful for your mocks.
 Wish you "**All the best!**" for your exam. 
 <br />
 <br />
-# _**Steps for setting up this interface**_ (.exe coming soon) -
+# _**Steps for setting up this interface**_ (.exe coming soon)
 > 1. Download and install Python 3.9.6 (https://www.python.org/downloads/release/python-396/) to PATH.
 > 2. Confirm python version by typing in "python --version", in case this doesn't work, use "python3 --version" and confirm version as 3.9.6
 > 3. Download this repo as zip by clicking on Code (in green, above) and "Download as Zip".
+> ![Screenshot 2022-04-24 18 38 00](https://user-images.githubusercontent.com/25398439/164978574-afba5224-4889-4783-875b-b4103fdfadab.png)
 > 4. Extract the contents to a particular folder.
 > 5. In this particular folder, open Command prompt by typing "cmd" in folder address bar OR use "cd" commands to navigate to the folder.
-> 6. Run script "pip install -r requirements.txt"
+> 6. Run script "pip install -r requirements.txt" (pip or pip3 depending on what worked in Step 2)
+> ![Screenshot 2022-04-24 18 51 21](https://user-images.githubusercontent.com/25398439/164978597-9903315c-59f9-40a6-b4ed-99b42ad2289b.png)
 > 7. Upon completion, redo Step 5.
 > 8. Type in "python PDF_MCQ_Test.py" and Enter. (python or python3 depending on what worked in Step 2)
 > 9. There you go ! Start attempting and analysing your mocks in a quick and digital way.
