@@ -1,6 +1,8 @@
 This GUI is primarily aimed for usage by UPSC aspirants. <br />
 However, that said, it can _work with any PDF that contains Questions and Answers in **split files**_ and support for fetching the questions and answers can be integrated to source code.
+
 <br />
+
 # Features of GUI include -
 > 1. Attempt time based mock papers.
 > 2. Add own comments (thought process) for question attempted.
@@ -12,9 +14,18 @@ However, that said, it can _work with any PDF that contains Questions and Answer
 
 Hope you find this useful for your mocks.
 Wish you "**All the best!**" for your exam. 
+
+
 <br />
+
+# _**Direct Download Links**_
+> Linux : https://drive.google.com/file/d/1mbpBUl5U-pbbJJCE67DZljwQE3eYsg0t/view?usp=sharing <br />
+> Windows : https://drive.google.com/file/d/14i55Z91GEmJGUP2yVf8tw2EcxqQZGkEr/view?usp=sharing <br />
+> MacOS : Coming Soon <br />
+
 <br />
-# _**Steps for setting up this interface**_ (.exe coming soon)
+
+# _**Steps for setting up this interface from source code**_
 > 1. Download and install Python 3.9.6 (https://www.python.org/downloads/release/python-396/) to PATH.
 > 2. Confirm python version by typing in "python --version", in case this doesn't work, use "python3 --version" and confirm version as 3.9.6
 > 3. Download this repo as zip by clicking on Code (in green, above) and "Download as Zip".
